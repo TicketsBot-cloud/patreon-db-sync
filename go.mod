@@ -4,7 +4,7 @@ go 1.22.4
 
 require (
 	github.com/TicketsBot/common v0.0.0-20240710005307-9cc26f78d8e3
-	github.com/TicketsBot/database v0.0.0-20240729222446-2c671b9b9366
+	github.com/TicketsBot/database v0.0.0-20240817175231-06d4e4da4111
 	github.com/caarlos0/env/v11 v11.2.2
 	github.com/getsentry/sentry-go v0.28.1
 	github.com/jackc/pgx/v4 v4.6.0
@@ -32,5 +32,3 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 )
-
-replace github.com/TicketsBot/database => ../database

@@ -1,5 +1,8 @@
 github.com/TicketsBot/common v0.0.0-20240710005307-9cc26f78d8e3 h1:Z4Ri2MC03YqLO+gY32SuWzt8SIL+QqwQYs59iizr7k8=
 github.com/TicketsBot/common v0.0.0-20240710005307-9cc26f78d8e3/go.mod h1:W1AwQkgiRyLxrpf8civa7p5ksKOGCyS0QocT5CPZVq8=
+github.com/TicketsBot/database v0.0.0-20240729222446-2c671b9b9366/go.mod h1:gAtOoQKZfCkQ4AoNWQUSl51Fnlqk+odzD/hZ1e1sXyI=
+github.com/TicketsBot/database v0.0.0-20240817175231-06d4e4da4111 h1:9z7ZrX+7bwNSg0BdkCvfq+4GRjwKDJUAhbb236QI9XU=
+github.com/TicketsBot/database v0.0.0-20240817175231-06d4e4da4111/go.mod h1:gAtOoQKZfCkQ4AoNWQUSl51Fnlqk+odzD/hZ1e1sXyI=
 github.com/caarlos0/env/v11 v11.2.2 h1:95fApNrUyueipoZN/EhA8mMxiNxrBwDa+oAZrMWl3Kg=
 github.com/caarlos0/env/v11 v11.2.2/go.mod h1:JBfcdeQiBoI3Zh1QRAWfe+tpiNTmDtcCj/hHHHMx0vc=
 github.com/cockroachdb/apd v1.1.0 h1:3LFP3629v+1aKXU5Q37mxmRxX/pIu1nijXydLShEq5I=
