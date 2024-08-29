@@ -3,9 +3,11 @@ package daemon
 import (
 	"context"
 	"fmt"
+	common "github.com/TicketsBot/common/model"
 	"github.com/TicketsBot/database"
 	"github.com/TicketsBot/patreon-db-sync/internal/config"
 	"github.com/TicketsBot/patreon-db-sync/internal/patreonproxy"
+	"github.com/TicketsBot/patreon-db-sync/internal/utils"
 	"github.com/TicketsBot/patreon-db-sync/pkg/model"
 	"go.uber.org/zap"
 	"time"
@@ -17,8 +19,6 @@ type Daemon struct {
 	logger  *zap.Logger
 	patreon *patreonproxy.Client
 }
-
-const ExecutionTimeout = time.Second * 90
 
 func NewDaemon(config config.Config, db *database.Database, logger *zap.Logger, patreon *patreonproxy.Client) *Daemon {
 	return &Daemon{
@@ -40,7 +40,7 @@ func (d *Daemon) Start() error {
 		select {
 		case <-timer.C:
 			start := time.Now()
-			if err := d.doRun(ctx, ExecutionTimeout); err != nil {
+			if err := d.doRun(ctx, d.config.ExecutionTimeout); err != nil {
 				d.logger.Error("Failed to run", zap.Error(err))
 			}
 
@@ -64,8 +64,16 @@ func (d *Daemon) doRun(ctx context.Context, timeout time.Duration) error {
 func (d *Daemon) RunOnce(ctx context.Context) error {
 	d.logger.Debug("Running synchronisation")
 
+	start := time.Now()
+	defer func() {
+		duration := time.Now().Sub(start)
+		if duration > (d.config.ExecutionTimeout / 2.0) {
+			d.logger.Warn("Execution took more than 50% of the timeout", zap.Duration("duration", duration))
+		}
+	}()
+
 	d.logger.Debug("Fetching entitlements")
-	res, err := d.patreon.ListEntitlements(ctx, true)
+	res, err := d.patreon.ListEntitlements(ctx, false)
 	if err != nil {
 		return err
 	}
@@ -90,7 +98,12 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 		return err
 	}
 
-	defer tx.Rollback(ctx)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+		defer cancel()
+
+		tx.Rollback(ctx)
+	}()
 
 	for userId, entitlements := range res.Entitlements {
 		if len(entitlements) == 0 {
@@ -106,27 +119,50 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 
 		d.logger.Debug("Updating entitlement", zap.Uint64("user_id", userId), zap.Any("entitlement", topEntitlement))
 
+		skuId, ok := d.config.TierSkus[topEntitlement.PatreonTierId]
+		if !ok {
+			d.logger.Error("Failed to find SKU by Patreon tier ID", zap.Any("entitlement", topEntitlement))
+			continue
+		}
+
+		// Store Patreon entitlement for user
 		if err := d.db.LegacyPremiumEntitlements.SetEntitlement(ctx, tx, database.LegacyPremiumEntitlement{
 			UserId:    userId,
 			TierId:    int32(topEntitlement.Tier),
 			SkuLabel:  string(topEntitlement.Label),
+			IsLegacy:  topEntitlement.IsLegacy,
 			ExpiresAt: topEntitlement.ExpiresAt,
 		}); err != nil {
 			d.logger.Error("Failed to set entitlement", zap.Uint64("user_id", userId), zap.Error(err))
 			return err
+		}
+
+		if topEntitlement.IsLegacy {
+			// Create entitlement in main entitlement table
+			entitlement, err := d.db.Entitlements.Create(ctx, tx, nil, utils.Ptr(userId), skuId, common.EntitlementSourcePatreon, nil)
+			if err != nil {
+				d.logger.Error("Failed to create entitlement", zap.Uint64("user_id", userId), zap.Error(err))
+				return err
+			}
+
+			// Link entitlements
+			if err := d.db.PatreonEntitlements.Insert(ctx, tx, entitlement.Id, userId); err != nil {
+				d.logger.Error("Failed to link entitlement", zap.Uint64("user_id", userId), zap.Error(err))
+				return err
+			}
 		}
 	}
 
 	d.logger.Info("Updated entitlements", zap.Int("count", len(res.Entitlements)))
 
 	if allowRemovals {
-		allEntitlements, err := d.db.LegacyPremiumEntitlements.ListAll(ctx, tx)
+		legacyEntitlements, err := d.db.LegacyPremiumEntitlements.ListAll(ctx, tx)
 		if err != nil {
 			return err
 		}
 
 		var removedCount int
-		for _, existingEntitlement := range allEntitlements {
+		for _, existingEntitlement := range legacyEntitlements {
 			var valid bool
 
 			userEntitlements, ok := res.Entitlements[existingEntitlement.UserId]
@@ -143,6 +179,26 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 
 			if !valid {
 				d.logger.Debug("Removing entitlement", zap.Uint64("user_id", existingEntitlement.UserId))
+
+				// Unlink entitlement
+				linkedEntitlements, err := d.db.PatreonEntitlements.ListByUser(ctx, tx, existingEntitlement.UserId)
+				if err != nil {
+					d.logger.Error("Failed to list linked entitlements", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+					return err
+				}
+
+				for _, linkedEntitlement := range linkedEntitlements {
+					if err := d.db.PatreonEntitlements.Delete(ctx, tx, linkedEntitlement.Id); err != nil {
+						d.logger.Error("Failed to unlink entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+						return err
+					}
+
+					if err := d.db.Entitlements.DeleteById(ctx, tx, linkedEntitlement.Id); err != nil {
+						d.logger.Error("Failed to remove linked entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+						return err
+					}
+				}
+
 				if err := d.db.LegacyPremiumEntitlements.Delete(ctx, tx, existingEntitlement.UserId, existingEntitlement.SkuLabel); err != nil {
 					d.logger.Error("Failed to remove entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
 					return err

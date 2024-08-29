@@ -3,8 +3,8 @@ module github.com/TicketsBot/patreon-db-sync
 go 1.22.4
 
 require (
-	github.com/TicketsBot/common v0.0.0-20240710005307-9cc26f78d8e3
-	github.com/TicketsBot/database v0.0.0-20240817175231-06d4e4da4111
+	github.com/TicketsBot/common v0.0.0-20240829105147-2265c4ef0305
+	github.com/TicketsBot/database v0.0.0-20240829100828-64014bc5d6bc
 	github.com/caarlos0/env/v11 v11.2.2
 	github.com/getsentry/sentry-go v0.28.1
 	github.com/jackc/pgx/v4 v4.6.0
@@ -13,6 +13,7 @@ require (
 
 require (
 	github.com/gofrs/uuid v3.3.0+incompatible // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.5.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect

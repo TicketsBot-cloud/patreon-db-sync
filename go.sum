@@ -1,8 +1,14 @@
 github.com/TicketsBot/common v0.0.0-20240710005307-9cc26f78d8e3 h1:Z4Ri2MC03YqLO+gY32SuWzt8SIL+QqwQYs59iizr7k8=
 github.com/TicketsBot/common v0.0.0-20240710005307-9cc26f78d8e3/go.mod h1:W1AwQkgiRyLxrpf8civa7p5ksKOGCyS0QocT5CPZVq8=
+github.com/TicketsBot/common v0.0.0-20240829094755-81a97811f613 h1:+KA++XTpySMsB6gZlJhrSBHAo8fGzg5y1t4igM9YVp8=
+github.com/TicketsBot/common v0.0.0-20240829094755-81a97811f613/go.mod h1:ygpxAa7348g+tuhDP/SoibZk/iym1DKMgieM+ZiD1c8=
+github.com/TicketsBot/common v0.0.0-20240829105147-2265c4ef0305 h1:Vhnad90PEDZoxLKUyairygfIniL1IVFhXT5uw6gVozI=
+github.com/TicketsBot/common v0.0.0-20240829105147-2265c4ef0305/go.mod h1:B1vHUs4teJ9kU9HXMHh/t21Rj/yenzitJdbxqAaymus=
 github.com/TicketsBot/database v0.0.0-20240729222446-2c671b9b9366/go.mod h1:gAtOoQKZfCkQ4AoNWQUSl51Fnlqk+odzD/hZ1e1sXyI=
 github.com/TicketsBot/database v0.0.0-20240817175231-06d4e4da4111 h1:9z7ZrX+7bwNSg0BdkCvfq+4GRjwKDJUAhbb236QI9XU=
 github.com/TicketsBot/database v0.0.0-20240817175231-06d4e4da4111/go.mod h1:gAtOoQKZfCkQ4AoNWQUSl51Fnlqk+odzD/hZ1e1sXyI=
+github.com/TicketsBot/database v0.0.0-20240829100828-64014bc5d6bc h1:kgAOQzPA/7xau5ptujVbDt4Oqrdli5BBeSORmhEYlyc=
+github.com/TicketsBot/database v0.0.0-20240829100828-64014bc5d6bc/go.mod h1:76LeVd5vxgSk0yg/TVtyaNBepfYpWgSqI41wuxNrgvQ=
 github.com/caarlos0/env/v11 v11.2.2 h1:95fApNrUyueipoZN/EhA8mMxiNxrBwDa+oAZrMWl3Kg=
 github.com/caarlos0/env/v11 v11.2.2/go.mod h1:JBfcdeQiBoI3Zh1QRAWfe+tpiNTmDtcCj/hHHHMx0vc=
 github.com/cockroachdb/apd v1.1.0 h1:3LFP3629v+1aKXU5Q37mxmRxX/pIu1nijXydLShEq5I=
@@ -24,6 +30,8 @@ github.com/gofrs/uuid v3.3.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRx
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1 h1:i+RDz65UE+mmpjTfyz0MoVTnzeYxroil2G82ki7MGG8=

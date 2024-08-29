@@ -70,7 +70,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), daemon.ExecutionTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), config.ExecutionTimeout)
 		defer cancel()
 
 		if err := d.RunOnce(ctx); err != nil {

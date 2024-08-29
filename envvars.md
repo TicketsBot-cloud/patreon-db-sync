@@ -1,5 +1,6 @@
 - `DAEMON`: Whether the service should run in daemon or oneshot mode, `true` or `false`
 - `RUN_FREQUENCY`: When using daemon mode, how often the sync operation should run in seconds
+- `EXECUTION_TIMEOUT`: How long after a synchronisation operation begins before it is considered to have timed out
 - `SENTRY_DSN`: The DSN for the Sentry instance to use for error reporting, optional
 - `JSON_LOGS`: Whether to log in JSON format, `true` or `false`
 - `LOG_LEVEL`: The minimum severity level to log
@@ -10,3 +11,4 @@
 removals will not occur if this threshold is not met.
 - `MAX_REMOVALS_THRESHOLD`: The maximum number of entitlement removals that can occur in a single run.
 - `GRACE_PERIOD_DAYS`: The number of days to wait before removing an entitlement after it has expired.
+- `TIER_SKUS`: A comma-separated map of Patreon tier IDs to internal entitlement UUIDS, e.g. `1234=aaaa-bbbb-cccc,5678=dddd-eeee-ffff`

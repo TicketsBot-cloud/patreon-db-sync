@@ -7,17 +7,10 @@ type (
 	SkuLabel string
 
 	Entitlement struct {
-		Tier      Tier      `json:"tier"`
-		Label     SkuLabel  `json:"label"`
-		IsLegacy  bool      `json:"is_legacy"`
-		ExpiresAt time.Time `json:"expires_at"`
+		Tier          Tier      `json:"tier"`
+		Label         SkuLabel  `json:"label"`
+		PatreonTierId uint64    `json:"patreon_tier_id"`
+		IsLegacy      bool      `json:"is_legacy"`
+		ExpiresAt     time.Time `json:"expires_at"`
 	}
-)
-
-const (
-	TierPremium Tier = iota
-	TierWhitelabel
-
-	SkuPremium    SkuLabel = "premium"
-	SkuWhitelabel SkuLabel = "whitelabel"
 )
