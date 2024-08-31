@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	common "github.com/TicketsBot/common/model"
+	"github.com/TicketsBot/common/premium"
 	"github.com/TicketsBot/database"
 	"github.com/TicketsBot/patreon-db-sync/internal/config"
 	"github.com/TicketsBot/patreon-db-sync/internal/patreonproxy"
@@ -135,6 +136,36 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 		}); err != nil {
 			d.logger.Error("Failed to set entitlement", zap.Uint64("user_id", userId), zap.Error(err))
 			return err
+		}
+
+		// TODO: Make this better
+		// TODO: Use tx
+		userSubs, err := d.db.Entitlements.ListUserSubscriptions(ctx, userId, time.Hour*24*time.Duration(d.config.GracePeriodDays))
+		if err != nil {
+			d.logger.Error("Failed to list user subscriptions", zap.Uint64("user_id", userId), zap.Error(err))
+			return err
+		}
+
+		// Filter for source = patreon
+		var userSubsPatreon []common.GuildEntitlementEntry
+		for _, sub := range userSubs {
+			if sub.Source == common.EntitlementSourcePatreon {
+				userSubsPatreon = append(userSubsPatreon, sub)
+			}
+		}
+
+		// len should = 0 or = 1 due to unique constraint
+		if len(userSubsPatreon) > 0 {
+			entitlement := userSubsPatreon[0]
+			tierOrder := premium.TierToInt(premium.TierFromEntitlement(entitlement.Tier))
+
+			if tierOrder != int(topEntitlement.Tier) {
+				d.logger.Info("Deleting and recreating entitlement due to differing tier", zap.Uint64("user_id", userId), zap.Any("entitlement", topEntitlement))
+				if err := d.db.Entitlements.DeleteById(ctx, tx, entitlement.Id); err != nil {
+					d.logger.Error("Failed to remove existing entitlement", zap.Uint64("user_id", userId), zap.Error(err))
+					return err
+				}
+			}
 		}
 
 		if topEntitlement.IsLegacy {
