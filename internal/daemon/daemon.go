@@ -161,6 +161,11 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 
 			if tierOrder != int(topEntitlement.Tier) {
 				d.logger.Info("Deleting and recreating entitlement due to differing tier", zap.Uint64("user_id", userId), zap.Any("entitlement", topEntitlement))
+				if err := d.db.PatreonEntitlements.Delete(ctx, tx, entitlement.Id); err != nil {
+					d.logger.Error("Failed to delete existing entitlement link", zap.Uint64("user_id", userId), zap.Error(err))
+					return err
+				}
+
 				if err := d.db.Entitlements.DeleteById(ctx, tx, entitlement.Id); err != nil {
 					d.logger.Error("Failed to remove existing entitlement", zap.Uint64("user_id", userId), zap.Error(err))
 					return err
