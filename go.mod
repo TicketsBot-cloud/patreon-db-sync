@@ -4,7 +4,7 @@ go 1.22.4
 
 require (
 	github.com/TicketsBot/common v0.0.0-20240829163706-02537ffffe45
-	github.com/TicketsBot/database v0.0.0-20240829163737-86b657b7e506
+	github.com/TicketsBot/database v0.0.0-20240901155918-d0c56594a09a
 	github.com/caarlos0/env/v11 v11.2.2
 	github.com/getsentry/sentry-go v0.28.1
 	github.com/google/uuid v1.6.0

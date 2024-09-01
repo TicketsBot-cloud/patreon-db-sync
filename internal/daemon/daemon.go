@@ -131,6 +131,7 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 			UserId:    userId,
 			TierId:    int32(topEntitlement.Tier),
 			SkuLabel:  string(topEntitlement.Label),
+			SkuId:     skuId,
 			IsLegacy:  topEntitlement.IsLegacy,
 			ExpiresAt: topEntitlement.ExpiresAt,
 		}); err != nil {
@@ -235,7 +236,26 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 					}
 				}
 
-				if err := d.db.LegacyPremiumEntitlements.Delete(ctx, tx, existingEntitlement.UserId, existingEntitlement.SkuLabel); err != nil {
+				// Remove any guild entitlements
+				guildEntitlements, err := d.db.LegacyPremiumEntitlementGuilds.ListForUser(ctx, tx, existingEntitlement.UserId)
+				if err != nil {
+					d.logger.Error("Failed to list guild entitlements", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+					return err
+				}
+
+				for _, guildEntitlement := range guildEntitlements {
+					if err := d.db.LegacyPremiumEntitlementGuilds.DeleteByEntitlement(ctx, tx, guildEntitlement.EntitlementId); err != nil {
+						d.logger.Error("Failed to remove guild entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+						return err
+					}
+
+					if err := d.db.Entitlements.DeleteById(ctx, tx, guildEntitlement.EntitlementId); err != nil {
+						d.logger.Error("Failed to remove guild entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+						return err
+					}
+				}
+
+				if err := d.db.LegacyPremiumEntitlements.Delete(ctx, tx, existingEntitlement.UserId); err != nil {
 					d.logger.Error("Failed to remove entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
 					return err
 				}
