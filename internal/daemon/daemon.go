@@ -112,7 +112,7 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 		d.logger.Error("Failed to list all active entitlements by user", zap.Error(err))
 		return err
 	}
-	d.logger.Debug("Fetched active entitlements", zap.Int("count", len(allUserSubs))
+	d.logger.Debug("Fetched active entitlements", zap.Int("count", len(allUserSubs)))
 
 	for userId, entitlements := range res.Entitlements {
 		if len(entitlements) == 0 {
