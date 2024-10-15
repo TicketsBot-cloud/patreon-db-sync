@@ -106,6 +106,12 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 		tx.Rollback(ctx)
 	}()
 
+	allUserSubs, err := d.listAllActiveEntitlementsByUser(ctx)
+	if err != nil {
+		d.logger.Error("Failed to list all active entitlements by user", zap.Error(err))
+		return err
+	}
+
 	for userId, entitlements := range res.Entitlements {
 		if len(entitlements) == 0 {
 			d.logger.Warn("User has no entitlements", zap.Uint64("user_id", userId))
@@ -141,10 +147,9 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 
 		// TODO: Make this better
 		// TODO: Use tx
-		userSubs, err := d.db.Entitlements.ListUserSubscriptions(ctx, userId, time.Hour*24*time.Duration(d.config.GracePeriodDays))
-		if err != nil {
-			d.logger.Error("Failed to list user subscriptions", zap.Uint64("user_id", userId), zap.Error(err))
-			return err
+		userSubs, ok := allUserSubs[userId]
+		if !ok {
+			userSubs = make([]common.GuildEntitlementEntry, 0)
 		}
 
 		// Filter for source = patreon
@@ -287,4 +292,27 @@ func (d *Daemon) findTopEntitlement(entitlements []model.Entitlement) model.Enti
 	}
 
 	return top
+}
+
+func (d *Daemon) listAllActiveEntitlementsByUser(ctx context.Context) (map[uint64][]common.GuildEntitlementEntry, error) {
+	allEntitlements, err := d.db.Entitlements.ListAllUserSubscriptions(ctx, time.Hour*24*time.Duration(d.config.GracePeriodDays))
+	if err != nil {
+		return nil, err
+	}
+
+	entitlements := make(map[uint64][]common.GuildEntitlementEntry)
+	for _, entitlement := range allEntitlements {
+		if entitlement.UserId == nil {
+			d.logger.Warn("Found entitlement with nil user ID", zap.Any("entitlement", entitlement))
+			continue
+		}
+
+		if _, ok := entitlements[*entitlement.UserId]; !ok {
+			entitlements[*entitlement.UserId] = make([]common.GuildEntitlementEntry, 0)
+		}
+
+		entitlements[*entitlement.UserId] = append(entitlements[*entitlement.UserId], entitlement)
+	}
+
+	return entitlements, nil
 }
