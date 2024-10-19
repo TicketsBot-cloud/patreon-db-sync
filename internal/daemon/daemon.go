@@ -147,8 +147,6 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 			return err
 		}
 
-		// TODO: Make this better
-		// TODO: Use tx
 		userSubs, ok := allUserSubs[userId]
 		if !ok {
 			userSubs = make([]common.GuildEntitlementEntry, 0)
@@ -164,17 +162,63 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 
 		// len should = 0 or = 1 due to unique constraint
 		if len(userSubsPatreon) > 0 {
-			entitlement := userSubsPatreon[0]
-			tierOrder := premium.TierToInt(premium.TierFromEntitlement(entitlement.Tier))
+			existingEntitlement := userSubsPatreon[0]
+			tierOrder := premium.TierToInt(premium.TierFromEntitlement(existingEntitlement.Tier))
 
 			if tierOrder != int(topEntitlement.Tier) {
 				d.logger.Info("Deleting and recreating entitlement due to differing tier", zap.Uint64("user_id", userId), zap.Any("entitlement", topEntitlement))
-				if err := d.db.PatreonEntitlements.Delete(ctx, tx, entitlement.Id); err != nil {
+				if err := d.db.PatreonEntitlements.Delete(ctx, tx, existingEntitlement.Id); err != nil {
 					d.logger.Error("Failed to delete existing entitlement link", zap.Uint64("user_id", userId), zap.Error(err))
 					return err
 				}
 
-				if err := d.db.Entitlements.DeleteById(ctx, tx, entitlement.Id); err != nil {
+				// Legacy entitlements are global, so don't need a guild mapping
+				if topEntitlement.IsLegacy {
+					if err := d.db.LegacyPremiumEntitlementGuilds.DeleteByEntitlement(ctx, tx, existingEntitlement.Id); err != nil {
+						d.logger.Error("Failed to remove legacy premium entitlement guilds", zap.Uint64("user_id", userId), zap.Stringer("existing_entitlement_id", existingEntitlement.Id), zap.Error(err))
+						return err
+					}
+				} else {
+					// Transfer over guild mapping if necessary
+					newSkuMaxServers, hasLimit, err := d.db.MultiServerSkus.GetPermittedServerCount(ctx, tx, skuId)
+					if err != nil {
+						d.logger.Error("Failed to get permitted server count", zap.Uint64("user_id", userId), zap.Stringer("sku_id", skuId), zap.Error(err))
+						return err
+					}
+
+					if hasLimit {
+						existingGuilds, err := d.db.LegacyPremiumEntitlementGuilds.ListForUser(ctx, tx, userId)
+						if err != nil {
+							d.logger.Error("Failed to list existing guilds", zap.Uint64("user_id", userId), zap.Error(err))
+							return err
+						}
+
+						if len(existingGuilds) > newSkuMaxServers {
+							existingGuilds = existingGuilds[:newSkuMaxServers]
+						}
+
+						for _, existingGuild := range existingGuilds {
+							entitlement, err := d.db.Entitlements.Create(ctx, tx, utils.Ptr(existingGuild.GuildId), utils.Ptr(userId), skuId, common.EntitlementSourcePatreon, nil)
+							if err != nil {
+								d.logger.Error("Failed to create entitlement", zap.Uint64("user_id", userId), zap.Uint64("guild_id", existingGuild.GuildId), zap.Error(err))
+								return err
+							}
+
+							if err := d.db.LegacyPremiumEntitlementGuilds.Insert(ctx, tx, userId, existingGuild.GuildId, entitlement.Id); err != nil {
+								d.logger.Error("Failed to insert legacy premium entitlement guild", zap.Uint64("user_id", userId), zap.Uint64("guild_id", existingGuild.GuildId), zap.Error(err))
+								return err
+							}
+						}
+					}
+
+					// Remove old mappings to old entitlement
+					if err := d.db.LegacyPremiumEntitlementGuilds.DeleteByEntitlement(ctx, tx, existingEntitlement.Id); err != nil {
+						d.logger.Error("Failed to remove legacy premium entitlement guilds", zap.Uint64("user_id", userId), zap.Stringer("existing_entitlement_id", existingEntitlement.Id), zap.Error(err))
+						return err
+					}
+				}
+
+				if err := d.db.Entitlements.DeleteById(ctx, tx, existingEntitlement.Id); err != nil {
 					d.logger.Error("Failed to remove existing entitlement", zap.Uint64("user_id", userId), zap.Error(err))
 					return err
 				}
