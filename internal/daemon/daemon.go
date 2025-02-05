@@ -3,6 +3,8 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"time"
+
 	common "github.com/TicketsBot/common/model"
 	"github.com/TicketsBot/common/premium"
 	"github.com/TicketsBot/database"
@@ -11,7 +13,6 @@ import (
 	"github.com/TicketsBot/patreon-db-sync/internal/utils"
 	"github.com/TicketsBot/patreon-db-sync/pkg/model"
 	"go.uber.org/zap"
-	"time"
 )
 
 type Daemon struct {
@@ -332,7 +333,7 @@ func (d *Daemon) findTopEntitlement(entitlements []model.Entitlement) model.Enti
 	top := entitlements[0]
 
 	for _, entitlement := range entitlements {
-		if entitlement.Tier >= top.Tier {
+		if entitlement.Priority > top.Priority {
 			top = entitlement
 		}
 	}
