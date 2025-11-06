@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/TicketsBot/common/observability"
-	"github.com/TicketsBot/database"
+	"time"
+
+	"github.com/TicketsBot-cloud/common/observability"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot/patreon-db-sync/internal/config"
 	"github.com/TicketsBot/patreon-db-sync/internal/daemon"
 	"github.com/TicketsBot/patreon-db-sync/internal/patreonproxy"
@@ -12,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"time"
 )
 
 func main() {

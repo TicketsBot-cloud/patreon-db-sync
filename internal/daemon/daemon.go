@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	common "github.com/TicketsBot/common/model"
-	"github.com/TicketsBot/common/premium"
-	"github.com/TicketsBot/database"
+	common "github.com/TicketsBot-cloud/common/model"
+	"github.com/TicketsBot-cloud/common/premium"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot/patreon-db-sync/internal/config"
 	"github.com/TicketsBot/patreon-db-sync/internal/patreonproxy"
 	"github.com/TicketsBot/patreon-db-sync/internal/utils"
@@ -167,7 +167,7 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 			tierOrder := premium.TierToInt(premium.TierFromEntitlement(existingEntitlement.Tier))
 
 			if tierOrder != int(topEntitlement.Tier) {
-				d.logger.Info("Deleting and recreating entitlement due to differing tier", zap.Uint64("user_id", userId), zap.Any("entitlement", topEntitlement))
+				d.logger.Info("Deleting and recreating entitlement due to differing tier", zap.Uint64("user_id", userId), zap.Any("entitlement", topEntitlement), zap.Int("tier_order", tierOrder), zap.Int("new_tier_order", int(topEntitlement.Tier)))
 				if err := d.db.PatreonEntitlements.Delete(ctx, tx, existingEntitlement.Id); err != nil {
 					d.logger.Error("Failed to delete existing entitlement link", zap.Uint64("user_id", userId), zap.Error(err))
 					return err
