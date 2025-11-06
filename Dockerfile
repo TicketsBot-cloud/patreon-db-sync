@@ -1,5 +1,5 @@
 # Build container
-FROM golang:1.22 AS builder
+FROM golang:1.25.3 AS builder
 
 RUN go version
 

@@ -1,8 +1,6 @@
 module github.com/TicketsBot/patreon-db-sync
 
-go 1.23.0
-
-toolchain go1.24.2
+go 1.25.3
 
 require (
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
