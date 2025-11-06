@@ -12,7 +12,6 @@ import (
 	"github.com/TicketsBot/patreon-db-sync/internal/patreonproxy"
 	"github.com/TicketsBot/patreon-db-sync/internal/utils"
 	"github.com/TicketsBot/patreon-db-sync/pkg/model"
-	"github.com/bytedance/gopkg/util/logger"
 	"go.uber.org/zap"
 )
 
@@ -167,7 +166,7 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 			existingEntitlement := userSubsPatreon[0]
 			tierOrder := premium.TierToInt(premium.TierFromEntitlement(existingEntitlement.Tier))
 
-			logger.Debug("Found existing entitlement", zap.Uint64("user_id", userId), zap.Any("existing_entitlement", existingEntitlement), zap.Int("tier_order", tierOrder), zap.Int("new_tier_order", int(topEntitlement.Tier)))
+			d.logger.Debug("Found existing entitlement", zap.Uint64("user_id", userId), zap.Any("existing_entitlement", existingEntitlement), zap.Int("tier_order", tierOrder), zap.Int("new_tier_order", int(topEntitlement.Tier)))
 
 			if tierOrder != int(topEntitlement.Tier) {
 				d.logger.Info("Deleting and recreating entitlement due to differing tier", zap.Uint64("user_id", userId), zap.Any("entitlement", topEntitlement), zap.Int("tier_order", tierOrder), zap.Int("new_tier_order", int(topEntitlement.Tier)))
