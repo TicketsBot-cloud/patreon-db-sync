@@ -180,6 +180,18 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 						return err
 					}
 				} else {
+					// Remove old mappings to old entitlement first
+					existingGuilds, err := d.db.LegacyPremiumEntitlementGuilds.ListForUser(ctx, tx, userId)
+					if err != nil {
+						d.logger.Error("Failed to list existing guilds", zap.Uint64("user_id", userId), zap.Error(err))
+						return err
+					}
+
+					if err := d.db.LegacyPremiumEntitlementGuilds.DeleteByEntitlement(ctx, tx, existingEntitlement.Id); err != nil {
+						d.logger.Error("Failed to remove legacy premium entitlement guilds", zap.Uint64("user_id", userId), zap.Stringer("existing_entitlement_id", existingEntitlement.Id), zap.Error(err))
+						return err
+					}
+
 					// Transfer over guild mapping if necessary
 					newSkuMaxServers, hasLimit, err := d.db.MultiServerSkus.GetPermittedServerCount(ctx, tx, skuId)
 					if err != nil {
@@ -188,12 +200,6 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 					}
 
 					if hasLimit {
-						existingGuilds, err := d.db.LegacyPremiumEntitlementGuilds.ListForUser(ctx, tx, userId)
-						if err != nil {
-							d.logger.Error("Failed to list existing guilds", zap.Uint64("user_id", userId), zap.Error(err))
-							return err
-						}
-
 						if len(existingGuilds) > newSkuMaxServers {
 							existingGuilds = existingGuilds[:newSkuMaxServers]
 						}
@@ -210,12 +216,6 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 								return err
 							}
 						}
-					}
-
-					// Remove old mappings to old entitlement
-					if err := d.db.LegacyPremiumEntitlementGuilds.DeleteByEntitlement(ctx, tx, existingEntitlement.Id); err != nil {
-						d.logger.Error("Failed to remove legacy premium entitlement guilds", zap.Uint64("user_id", userId), zap.Stringer("existing_entitlement_id", existingEntitlement.Id), zap.Error(err))
-						return err
 					}
 				}
 
