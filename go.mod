@@ -2,6 +2,10 @@ module github.com/TicketsBot/patreon-db-sync
 
 go 1.25.3
 
+//replace github.com/TicketsBot-cloud/common => ../common
+
+//replace github.com/TicketsBot-cloud/database => ../database
+
 require (
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
 	github.com/TicketsBot-cloud/database v0.0.0-20250603194547-7b95c33be9d4
