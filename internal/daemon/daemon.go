@@ -67,7 +67,7 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 
 	start := time.Now()
 	defer func() {
-		duration := time.Now().Sub(start)
+		duration := time.Since(start)
 		if duration > (d.config.ExecutionTimeout / 2.0) {
 			d.logger.Warn("Execution took more than 50% of the timeout", zap.Duration("duration", duration))
 		}
@@ -121,7 +121,7 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 		}
 
 		topEntitlement := d.findTopEntitlement(entitlements)
-		if topEntitlement.ExpiresAt.Add(time.Hour * 24 * time.Duration(d.config.GracePeriodDays)).Before(time.Now()) {
+		if !topEntitlement.ExpiresAt.IsZero() && topEntitlement.ExpiresAt.Add(time.Hour * 24 * time.Duration(d.config.GracePeriodDays)).Before(time.Now()) {
 			d.logger.Debug("Received expired entitlement", zap.Uint64("user_id", userId), zap.Any("entitlement", topEntitlement))
 			continue
 		}
@@ -223,6 +223,16 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 					d.logger.Error("Failed to remove existing entitlement", zap.Uint64("user_id", userId), zap.Error(err))
 					return err
 				}
+			} else {
+				// SKU matches - subscription is active again
+				// If the entitlement was in grace period (has expires_at set), reset it to NULL
+				if existingEntitlement.ExpiresAt != nil {
+					d.logger.Info("Restoring entitlement from grace period", zap.Uint64("user_id", userId), zap.Stringer("entitlement_id", existingEntitlement.Id))
+					if err := d.db.Entitlements.SetExpiresAt(ctx, tx, existingEntitlement.Id, nil); err != nil {
+						d.logger.Error("Failed to reset expires_at", zap.Uint64("user_id", userId), zap.Error(err))
+						return err
+					}
+				}
 			}
 		}
 
@@ -259,7 +269,7 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 				for _, entitlement := range userEntitlements {
 					// Match entitlement: tier should match, as we've already run the update
 					if entitlement.Label == model.SkuLabel(existingEntitlement.SkuLabel) &&
-						entitlement.ExpiresAt.Add(time.Hour*24*time.Duration(d.config.GracePeriodDays)).After(time.Now()) {
+						(entitlement.ExpiresAt.IsZero() || entitlement.ExpiresAt.Add(time.Hour*24*time.Duration(d.config.GracePeriodDays)).After(time.Now())) {
 						valid = true
 						break
 					}
@@ -267,54 +277,110 @@ func (d *Daemon) RunOnce(ctx context.Context) error {
 			}
 
 			if !valid {
-				d.logger.Debug("Removing entitlement", zap.Uint64("user_id", existingEntitlement.UserId))
-
-				// Unlink entitlement
+				// Get linked entitlements to check grace period status
 				linkedEntitlements, err := d.db.PatreonEntitlements.ListByUser(ctx, tx, existingEntitlement.UserId)
 				if err != nil {
 					d.logger.Error("Failed to list linked entitlements", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
 					return err
 				}
 
-				for _, linkedEntitlement := range linkedEntitlements {
-					if err := d.db.PatreonEntitlements.Delete(ctx, tx, linkedEntitlement.Id); err != nil {
-						d.logger.Error("Failed to unlink entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
-						return err
-					}
-
-					if err := d.db.Entitlements.DeleteById(ctx, tx, linkedEntitlement.Id); err != nil {
-						d.logger.Error("Failed to remove linked entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
-						return err
-					}
-				}
-
-				// Remove any guild entitlements
+				// Get guild entitlements
 				guildEntitlements, err := d.db.LegacyPremiumEntitlementGuilds.ListForUser(ctx, tx, existingEntitlement.UserId)
 				if err != nil {
 					d.logger.Error("Failed to list guild entitlements", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
 					return err
 				}
 
-				for _, guildEntitlement := range guildEntitlements {
-					if err := d.db.LegacyPremiumEntitlementGuilds.DeleteByEntitlement(ctx, tx, guildEntitlement.EntitlementId); err != nil {
-						d.logger.Error("Failed to remove guild entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+				// Determine if we should start grace period, continue grace period, or delete
+				var shouldDelete bool
+				var shouldStartGracePeriod bool
+
+				if len(linkedEntitlements) > 0 {
+					// Check the first entitlement's expires_at (all should have same value)
+					firstEntitlement := linkedEntitlements[0]
+					if firstEntitlement.ExpiresAt == nil {
+						// Start grace period
+						shouldStartGracePeriod = true
+					} else if firstEntitlement.ExpiresAt.Before(time.Now()) {
+						// Grace period expired
+						shouldDelete = true
+					}
+				} else if len(guildEntitlements) > 0 {
+					// No linked entitlements, check guild entitlements
+					// Get the first guild entitlement to check expires_at
+					firstGuildEnt, err := d.db.Entitlements.GetById(ctx, tx, guildEntitlements[0].EntitlementId)
+					if err != nil {
+						d.logger.Error("Failed to get guild entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
 						return err
 					}
 
-					if err := d.db.Entitlements.DeleteById(ctx, tx, guildEntitlement.EntitlementId); err != nil {
-						d.logger.Error("Failed to remove guild entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
-						return err
+					if firstGuildEnt != nil {
+						if firstGuildEnt.ExpiresAt == nil {
+							shouldStartGracePeriod = true
+						} else if firstGuildEnt.ExpiresAt.Before(time.Now()) {
+							shouldDelete = true
+						}
 					}
 				}
 
-				if err := d.db.LegacyPremiumEntitlements.Delete(ctx, tx, existingEntitlement.UserId); err != nil {
-					d.logger.Error("Failed to remove entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
-					return err
+				if shouldStartGracePeriod {
+					// Start grace period by setting expires_at
+					gracePeriodEnd := time.Now().Add(time.Hour * 24 * time.Duration(d.config.GracePeriodDays))
+					d.logger.Info("Starting grace period for entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Time("expires_at", gracePeriodEnd))
+
+					// Set expires_at for all linked entitlements
+					for _, linkedEntitlement := range linkedEntitlements {
+						if err := d.db.Entitlements.SetExpiresAt(ctx, tx, linkedEntitlement.Id, &gracePeriodEnd); err != nil {
+							d.logger.Error("Failed to set expires_at for linked entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+							return err
+						}
+					}
+
+					// Set expires_at for all guild entitlements
+					for _, guildEntitlement := range guildEntitlements {
+						if err := d.db.Entitlements.SetExpiresAt(ctx, tx, guildEntitlement.EntitlementId, &gracePeriodEnd); err != nil {
+							d.logger.Error("Failed to set expires_at for guild entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+							return err
+						}
+					}
+				} else if shouldDelete {
+					// Grace period expired - delete everything
+					d.logger.Info("Removing entitlement after grace period", zap.Uint64("user_id", existingEntitlement.UserId))
+
+					// Unlink and delete entitlements
+					for _, linkedEntitlement := range linkedEntitlements {
+						if err := d.db.PatreonEntitlements.Delete(ctx, tx, linkedEntitlement.Id); err != nil {
+							d.logger.Error("Failed to unlink entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+							return err
+						}
+
+						if err := d.db.Entitlements.DeleteById(ctx, tx, linkedEntitlement.Id); err != nil {
+							d.logger.Error("Failed to remove linked entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+							return err
+						}
+					}
+
+					// Remove guild entitlements
+					for _, guildEntitlement := range guildEntitlements {
+						if err := d.db.LegacyPremiumEntitlementGuilds.DeleteByEntitlement(ctx, tx, guildEntitlement.EntitlementId); err != nil {
+							d.logger.Error("Failed to remove guild entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+							return err
+						}
+
+						if err := d.db.Entitlements.DeleteById(ctx, tx, guildEntitlement.EntitlementId); err != nil {
+							d.logger.Error("Failed to remove guild entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+							return err
+						}
+					}
+
+					// Remove from legacy table
+					if err := d.db.LegacyPremiumEntitlements.Delete(ctx, tx, existingEntitlement.UserId); err != nil {
+						d.logger.Error("Failed to remove entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Error(err))
+						return err
+					}
+
+					removedCount++
 				}
-
-				d.logger.Info("Removed entitlement", zap.Uint64("user_id", existingEntitlement.UserId), zap.Time("expires_at", existingEntitlement.ExpiresAt))
-
-				removedCount++
 			}
 		}
 
